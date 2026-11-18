@@ -45,6 +45,11 @@ main{position:relative; z-index:1; padding:10px 14px}
 .delbtn{padding:10px 14px; font-size:14px; font-weight:900; border:2px solid #D8A08E; border-radius:10px; background:#FBEEE9; color:var(--red); cursor:pointer}
 .empty{padding:36px 20px; text-align:center; color:var(--sub); font-size:15px; line-height:1.8}
 footer{position:relative; z-index:1; padding:6px 16px; font-size:11.5px; color:var(--sub); line-height:1.7}
+.backup{margin-top:16px}
+.backup h2{font-size:15px; margin:0 0 8px; color:var(--green-dk)}
+.backup p{font-size:13.5px; color:var(--sub); line-height:1.7; margin:0 0 12px}
+.backup .bk-note{font-size:12.5px; margin:12px 0 0}
+.backup .cancelbtn{flex-shrink:0}
 </style>
 </head>
 <body>
@@ -85,6 +90,17 @@ footer{position:relative; z-index:1; padding:6px 16px; font-size:11.5px; color:v
 
   <p class="count" id="count"></p>
   <div id="list"></div>
+
+  <div class="form backup">
+    <h2>💾 データの保存・復元（バックアップ）</h2>
+    <p>得意先データをファイルに保存しておけます。機種変更やブラウザのデータ削除の前に保存しておくと、復元できます。</p>
+    <div class="btnrow">
+      <button class="addbtn" id="exportBtn">バックアップを保存</button>
+      <button class="cancelbtn" id="importBtn">バックアップから復元</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json,.json" style="display:none">
+    <p class="bk-note">保存したファイルは「ファイル」アプリに残ります。復元すると、今の得意先データはファイルの中身で置き換わります。</p>
+  </div>
 </main>
 <footer>
   データはこの端末のブラウザの中に保存されます（別の端末には移りません）。並び順は店名順です。
@@ -173,6 +189,33 @@ $("save").addEventListener("click", ()=>{
 });
 $("cancel").addEventListener("click", resetForm);
 $("q").addEventListener("input", e=>{ query = e.target.value.trim(); render(); });
+$("exportBtn").addEventListener("click", ()=>{
+  const blob = new Blob([JSON.stringify({version:1, exportedAt:new Date().toISOString(), items:items, collapsed:[...collapsed]}, null, 2)], {type:"application/json"});
+  const a = document.createElement("a");
+  const d = new Date(), p = n=>String(n).padStart(2,"0");
+  a.href = URL.createObjectURL(blob);
+  a.download = "client-directory-" + d.getFullYear() + p(d.getMonth()+1) + p(d.getDate()) + ".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href), 5000);
+});
+$("importBtn").addEventListener("click", ()=>$("importFile").click());
+$("importFile").addEventListener("change", e=>{
+  const f = e.target.files && e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = ()=>{
+    try{
+      const d = JSON.parse(r.result);
+      const list = Array.isArray(d) ? d : d.items;
+      if(!Array.isArray(list) || !list.every(x=>x && typeof x.store === "string")) throw new Error("bad");
+      if(!confirm("今の得意先データを、バックアップファイルの中身で置き換えますか？")) return;
+      items = list;
+      if(d && Array.isArray(d.collapsed)){ collapsed = new Set(d.collapsed.filter(v=>typeof v === "number")); saveCollapsed(); }
+      editingId = null; resetForm(); save(); render(); alert("復元しました。");
+    }catch(err){ alert("このファイルは復元できませんでした。バックアップ用のJSONファイルを選んでください。"); }
+    e.target.value = "";
+  };
+  r.readAsText(f);
+});
 render();
 </script>
 </body>
